@@ -9,6 +9,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 
+import org.osmdroid.util.GeoPoint;
 import org.osmdroid.views.MapController;
 import org.osmdroid.views.MapView;
 
@@ -76,6 +77,7 @@ public class ZombieMap extends ActionBarActivity {
             mapView.setMultiTouchControls(true);
             mapController = (MapController) this.mapView.getController();
             mapController.setZoom(6);
+            mapController.setCenter(new GeoPoint(55, 71));
 
             return rootView;
         }
