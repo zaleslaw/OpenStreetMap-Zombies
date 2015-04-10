@@ -1,11 +1,13 @@
 package com.zaleslaw.osmzombies;
 
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.drawable.Drawable;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.support.v4.app.Fragment;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -42,6 +44,9 @@ public class ZombieMapFragment extends Fragment {
     private MainGameThread loopThread;
     private List<Zombie> zombies = new ArrayList<>();
 
+    private boolean isMapInitialized;
+    private boolean isLBSrequested;
+
 
     public ZombieMapFragment() {
     }
@@ -50,33 +55,85 @@ public class ZombieMapFragment extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         View rootView = inflater.inflate(R.layout.fragment_zombie_map, container, false);
+
+        lm = (LocationManager) getActivity().getApplicationContext().getSystemService(Context.LOCATION_SERVICE);
+        mResourceProxy = new DefaultResourceProxyImpl(getActivity().getApplicationContext());
+        lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, myLocationListener);
+        lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, myLocationListener);
+
+
+        prepareMap(rootView);
+        startGame();
+        return rootView;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+
+        // Start game loop
+
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+
+        //
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        lm.removeUpdates(myLocationListener);
+        stopGameLoop();
+    }
+
+    private void stopGameLoop() {
+        // Stop game loop
+        boolean retry = true;
+        if (loopThread != null) {
+            loopThread.setRunning(false);
+            while (retry) {
+                try {
+                    loopThread.join();
+                    retry = false;
+                } catch (InterruptedException e) {
+                }
+            }
+        }
+    }
+
+
+    public void startGame() {
         if (this.isAdded()) {
-
             loopThread = new MainGameThread(this);
+            loopThread.setRunning(true);
+            loopThread.start();
+        } else {
+            Log.e("ZM", "Fragment isn't added");
+        }
+    }
 
-            mResourceProxy = new DefaultResourceProxyImpl(getActivity().getApplicationContext());
-            mapView = (MapView) rootView.findViewById(R.id.mapview);
-            mapView.setBuiltInZoomControls(true);
-            mapView.setMultiTouchControls(true);
+    public void initializeMap() {
 
-            mapController = (MapController) this.mapView.getController();
-            mapController.setZoom(18);
+        gamerLocation = getLastKnownLocation();
 
-            Location location = setLastKnownLocation();
-            GeoPoint centerPoint = new GeoPoint(location.getLatitude(), location.getLongitude());// TODO : NullPointer if location is disabled
+        if (gamerLocation != null) {
+
+            GeoPoint centerPoint = new GeoPoint(gamerLocation.getLatitude(), gamerLocation.getLongitude());// TODO : NullPointer if location is disabled
             mapController.setCenter(centerPoint);
 
             // Load initial zombie state
-            zombies = dao.getZombies(location);
+            zombies = dao.getZombies(gamerLocation);
             ArrayList<OverlayItem> items = getZombieOverlayItems(zombies);
-
 
             mMyLocationOverlay = new ItemizedIconOverlay<OverlayItem>(items,
                     new ItemizedIconOverlay.OnItemGestureListener<OverlayItem>() {
                         @Override
-                        /*
-                           It removes tapped marker
-                         */
+                    /*
+                       It removes tapped marker
+                     */
                         public boolean onItemSingleTapUp(final int index,
                                                          final OverlayItem item) {
                             // TODO: simple record increasing. Should to change on call special game logic method
@@ -98,15 +155,12 @@ public class ZombieMapFragment extends Fragment {
 
             mMyLocationOverlay.addItem(gamerItem);
 
-
             mapView.getOverlays().add(mMyLocationOverlay);
             mapView.invalidate();
-        } else {
-            Log.e("ZM", "Fragment isn't added");
+            isMapInitialized = true;
         }
 
 
-        return rootView;
     }
 
     // It removes marker if it is not 'me' marker
@@ -114,37 +168,6 @@ public class ZombieMapFragment extends Fragment {
         if (!item.getTitle().equals(ME)) {
             mMyLocationOverlay.removeItem(item);
         }
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, myLocationListener);
-        lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, myLocationListener);
-
-        // Start game loop
-        loopThread.setRunning(true);
-        loopThread.start();// TODO: bug with resume
-
-
-    }
-
-    @Override
-    public void onPause() {
-        super.onPause();
-        lm.removeUpdates(myLocationListener);
-
-        // Stop game loop
-        boolean retry = true;
-        loopThread.setRunning(false);
-        while (retry) {
-            try {
-                loopThread.join();
-                retry = false;
-            } catch (InterruptedException e) {
-            }
-        }
-
     }
 
     private ArrayList<OverlayItem> getZombieOverlayItems(List<Zombie> zombies) {
@@ -191,35 +214,40 @@ public class ZombieMapFragment extends Fragment {
             item.setMarker(getResources().getDrawable(center));
             mMyLocationOverlay.addItem(item);
         }
-
     }
 
     private void removeMarkerById(String id) {
-
         for (int i = 0; i < mMyLocationOverlay.size(); i++) {
             OverlayItem item = mMyLocationOverlay.getItem(i);
             if (item == null) {
                 continue;
             } else {
-                Log.d("ZM", item + " " + item.getTitle() + " " + item.getTitle());
+                //Log.d("ZM", item + " " + item.getTitle() + " " + item.getTitle());
                 if (item.getTitle().equals(id)) { // TODO: title can be null
                     //unsafe removing if you delete more than one time
                     mMyLocationOverlay.removeItem(item);
                 }
             }
-
         }
 
     }
 
-    private Location setLastKnownLocation() {
-        lm = (LocationManager) getActivity().getApplicationContext().getSystemService(Context.LOCATION_SERVICE);
+    private Location getLastKnownLocation() {
         final Location location = LocationUtils.getLastKnownLocation(lm);
         if (location != null) {
-            Log.d("ZM", location.toString());
+            //Log.d("ZM", location.toString());
             return location;
         }
         return null;
+
+    }
+
+    private boolean isLocationServicesEnabled() {
+        if (!lm.isProviderEnabled(LocationManager.GPS_PROVIDER) && !lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+            return false;
+        } else {
+            return true;
+        }
     }
 
     /*
@@ -258,9 +286,32 @@ public class ZombieMapFragment extends Fragment {
     private void displayZombieLocations() {
         // TODO : simple clearing. Should to filter items and keep part of them
         mMyLocationOverlay.removeAllItems();
-
-
         mMyLocationOverlay.addItems(getZombieOverlayItems(zombies));
         addMyNewLocationMarker(gamerLocation);
+    }
+
+
+    public void requestLocationServicesEnabling() {
+        if (!isLocationServicesEnabled()) {
+            Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+            startActivity(intent);
+        }
+        isLBSrequested = true;
+    }
+
+    private void prepareMap(View rootView) {
+        mapView = (MapView) rootView.findViewById(R.id.mapview);
+        mapView.setBuiltInZoomControls(true);
+        mapView.setMultiTouchControls(true);
+        mapController = (MapController) this.mapView.getController();
+        mapController.setZoom(18);
+    }
+
+    public synchronized boolean isLBSrequested() {
+        return isLBSrequested;
+    }
+
+    public synchronized boolean isMapInitialized() {
+        return isMapInitialized;
     }
 }

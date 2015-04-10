@@ -1,5 +1,7 @@
 package com.zaleslaw.osmzombies;
 
+import android.os.Handler;
+
 /**
  * Game loop is based on theory provided by the next link
  * http://obviam.net/index.php/the-android-game-loop/
@@ -27,14 +29,38 @@ public class MainGameThread extends Thread {
     }
 
     public void run() {
-        long ticksPS = 1000 / FPS;
+        long ticksPS = 10000 / FPS; // not real FPS
         long startTime;
         long sleepTime;
+        Handler handler = new Handler(gameView.getActivity().getMainLooper());
         while (running) {
 
             startTime = System.currentTimeMillis();
-            gameView.updateGameState();
-            gameView.displayGameState();
+            if (!gameView.isLBSrequested()) {
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        gameView.requestLocationServicesEnabling();
+                    }
+                });
+
+            } else if (!gameView.isMapInitialized()) {
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        gameView.initializeMap();
+                    }
+                });
+            } else {
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        gameView.updateGameState();
+                        gameView.displayGameState();
+                    }
+                });
+            }
+
             sleepTime = ticksPS - (System.currentTimeMillis() - startTime);
             try {
                 if (sleepTime > 0)
