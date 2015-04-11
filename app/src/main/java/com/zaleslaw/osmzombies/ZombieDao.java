@@ -13,7 +13,7 @@ public class ZombieDao {
         double zombieLon = location.getLongitude() * (1 - new Random().nextDouble() / 10000);
 
         List<Zombie> zombieList = new ArrayList<Zombie>();
-        Zombie zombie1 = new Zombie("Z1", "Old Frank", zombieLat, zombieLon);
+        Zombie zombie1 = new Zombie("Z0", "Old Frank", null, 3, 10, zombieLat, zombieLon);
         zombieList.add(zombie1);
         return zombieList;
     }

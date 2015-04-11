@@ -4,12 +4,18 @@ package com.zaleslaw.osmzombies;
 public class Zombie {
     private String id;
     private String name;
+    private String description;
+    private int health;
+    private int speed;
     private double lat;
     private double lon;
 
-    public Zombie(String id, String name, double lat, double lon) {
+    public Zombie(String id, String name, String description, int health, int speed, double lat, double lon) {
         this.id = id;
         this.name = name;
+        this.description = description;
+        this.health = health;
+        this.speed = speed;
         this.lat = lat;
         this.lon = lon;
     }
@@ -49,5 +55,37 @@ public class Zombie {
 
     public String getName() {
         return name;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public int getHealth() {
+        return health;
+    }
+
+    public void setHealth(int health) {
+        this.health = health;
+    }
+
+    public int getSpeed() {
+        return speed;
+    }
+
+    public void setSpeed(int speed) {
+        this.speed = speed;
+    }
+
+    public void decreaseHealth(int i) {
+        health -= i;
+    }
+
+    public void kill() {
+        health = 0;
     }
 }

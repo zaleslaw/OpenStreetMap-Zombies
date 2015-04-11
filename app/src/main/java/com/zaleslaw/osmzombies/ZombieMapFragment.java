@@ -13,8 +13,10 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Toast;
 
 import org.osmdroid.DefaultResourceProxyImpl;
+import org.osmdroid.api.IGeoPoint;
 import org.osmdroid.util.GeoPoint;
 import org.osmdroid.util.LocationUtils;
 import org.osmdroid.views.MapController;
@@ -24,26 +26,24 @@ import org.osmdroid.views.overlay.OverlayItem;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 import static com.zaleslaw.osmzombies.R.drawable.center;
 import static com.zaleslaw.osmzombies.R.drawable.zombie;
 
 public class ZombieMapFragment extends Fragment {
 
-    public static final String ME = "Me";
+
     private MapView mapView;
     private MapController mapController;
 
     private DefaultResourceProxyImpl mResourceProxy;
     private ItemizedIconOverlay<OverlayItem> mMyLocationOverlay;
-    private ZombieDao dao = new ZombieDao();
+
     private LocationManager lm;
     private Location gamerLocation;
 
     private MainGameThread loopThread;
-    private List<Zombie> zombies = new ArrayList<>();
-
+    private ZombieService service = new ZombieService();
     private boolean isMapInitialized;
     private boolean isLBSrequested;
 
@@ -70,16 +70,11 @@ public class ZombieMapFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-
-        // Start game loop
-
     }
 
     @Override
     public void onPause() {
         super.onPause();
-
-        //
     }
 
     @Override
@@ -121,11 +116,11 @@ public class ZombieMapFragment extends Fragment {
 
         if (gamerLocation != null) {
 
-            GeoPoint centerPoint = new GeoPoint(gamerLocation.getLatitude(), gamerLocation.getLongitude());// TODO : NullPointer if location is disabled
+            GeoPoint centerPoint = new GeoPoint(gamerLocation.getLatitude(), gamerLocation.getLongitude());
             mapController.setCenter(centerPoint);
 
             // Load initial zombie state
-            zombies = dao.getZombies(gamerLocation);
+            List<Zombie> zombies = service.getFirstGeneration(gamerLocation);
             ArrayList<OverlayItem> items = getZombieOverlayItems(zombies);
 
             mMyLocationOverlay = new ItemizedIconOverlay<OverlayItem>(items,
@@ -136,24 +131,21 @@ public class ZombieMapFragment extends Fragment {
                      */
                         public boolean onItemSingleTapUp(final int index,
                                                          final OverlayItem item) {
-                            // TODO: simple record increasing. Should to change on call special game logic method
-                            loopThread.setRecord(loopThread.getRecord() + 1);
-                            removeMarker(item);
+                            service.kickZombie(item.getUid());
                             return true;
                         }
 
                         @Override
                         public boolean onItemLongPress(final int index,
                                                        final OverlayItem item) {
-
-                            return false;
+                            service.killZombie(item.getUid());
+                            return true;
                         }
                     }, mResourceProxy);
 
-            OverlayItem gamerItem = new OverlayItem(ME, ME, centerPoint);
-            gamerItem.setMarker(getResources().getDrawable(center));
 
-            mMyLocationOverlay.addItem(gamerItem);
+            Survivor survivor = service.createSurvivor(10, gamerLocation.getLatitude(), gamerLocation.getLongitude());
+            mMyLocationOverlay.addItem(getSurvivorOverlayItem(survivor));
 
             mapView.getOverlays().add(mMyLocationOverlay);
             mapView.invalidate();
@@ -163,20 +155,18 @@ public class ZombieMapFragment extends Fragment {
 
     }
 
-    // It removes marker if it is not 'me' marker
-    private void removeMarker(OverlayItem item) {
-        if (!item.getTitle().equals(ME)) {
-            mMyLocationOverlay.removeItem(item);
-        }
+    private OverlayItem getSurvivorOverlayItem(Survivor s) {
+        OverlayItem gamerItem = new OverlayItem(s.getId(), s.getName(), s.getDescription(), new GeoPoint(s.getLat(), s.getLon()));
+        gamerItem.setMarker(getResources().getDrawable(center));
+        return gamerItem;
     }
 
     private ArrayList<OverlayItem> getZombieOverlayItems(List<Zombie> zombies) {
-
-        final Drawable drawable = getResources().getDrawable(zombie);
+        Drawable zombiePic = getResources().getDrawable(zombie);
         ArrayList<OverlayItem> items = new ArrayList<>();
         for (Zombie z : zombies) {
             OverlayItem item = new OverlayItem(z.getId(), z.getName(), new GeoPoint(z.getLat(), z.getLon()));
-            item.setMarker(drawable);
+            item.setMarker(zombiePic);
             items.add(item);
         }
         return items;
@@ -203,43 +193,26 @@ public class ZombieMapFragment extends Fragment {
         }
     };
 
-    private void updateLoc(Location loc) {
-        gamerLocation = loc;
-        Log.d("ZM", "Update location " + loc.toString());
+    private void updateLoc(Location location) {
+        gamerLocation = location;
+        Log.d("ZM", "Update location " + location.toString());
     }
 
-    private void addMyNewLocationMarker(Location loc) {
-        if (gamerLocation != null) {
-            OverlayItem item = new OverlayItem(ME, ME, new GeoPoint(loc.getLatitude(), loc.getLongitude()));
-            item.setMarker(getResources().getDrawable(center));
-            mMyLocationOverlay.addItem(item);
-        }
-    }
+    private GeoPoint addMyNewLocationMarker() {
+        final Survivor s = service.getSurvivor();
+        OverlayItem item = getSurvivorOverlayItem(s);
+        mMyLocationOverlay.addItem(item);
 
-    private void removeMarkerById(String id) {
-        for (int i = 0; i < mMyLocationOverlay.size(); i++) {
-            OverlayItem item = mMyLocationOverlay.getItem(i);
-            if (item == null) {
-                continue;
-            } else {
-                //Log.d("ZM", item + " " + item.getTitle() + " " + item.getTitle());
-                if (item.getTitle().equals(id)) { // TODO: title can be null
-                    //unsafe removing if you delete more than one time
-                    mMyLocationOverlay.removeItem(item);
-                }
-            }
-        }
+        return new GeoPoint(s.getLat(), s.getLon());
 
     }
 
     private Location getLastKnownLocation() {
         final Location location = LocationUtils.getLastKnownLocation(lm);
         if (location != null) {
-            //Log.d("ZM", location.toString());
             return location;
         }
         return null;
-
     }
 
     private boolean isLocationServicesEnabled() {
@@ -254,42 +227,34 @@ public class ZombieMapFragment extends Fragment {
     * Simple implementation
     * */
     public void updateGameState() {
-        Location lastGamerPosition = gamerLocation;
-        if (lastGamerPosition != null) {
-            double zombieLat = lastGamerPosition.getLatitude() * (1 - new Random().nextDouble() / 1000);
-            double zombieLon = lastGamerPosition.getLongitude() * (1 - new Random().nextDouble() / 1000);
-            for (Zombie z : zombies) {
-                z.setLat(zombieLat);
-                z.setLon(zombieLon);
-            }
+        service.updateSurvivorPosition(gamerLocation);
+        service.filterAliveZombies();
+        service.updateZombieLocations();
+        service.generateNewZombies();
+        boolean endGame = service.verifyEndGameCondition();
+        if (endGame) {
+            loopThread.setRunning(false);
+            Toast.makeText(getActivity(), "You are death!", Toast.LENGTH_SHORT).show();
         }
     }
 
-    private void updateGamerLocation() {
-        if (gamerLocation != null) {
-            GeoPoint locGeoPoint = new GeoPoint(gamerLocation.getLatitude(), gamerLocation.getLongitude());
-            removeMarkerById(ME);
-            addMyNewLocationMarker(gamerLocation);
-            mapController.setCenter(locGeoPoint);
-        }
-
-    }
 
     public void displayGameState() {
         if (gamerLocation != null) {
-            updateGamerLocation();
+            displaySurvivorLocation();
             displayZombieLocations();
         }
-
     }
 
     private void displayZombieLocations() {
-        // TODO : simple clearing. Should to filter items and keep part of them
         mMyLocationOverlay.removeAllItems();
-        mMyLocationOverlay.addItems(getZombieOverlayItems(zombies));
-        addMyNewLocationMarker(gamerLocation);
+        mMyLocationOverlay.addItems(getZombieOverlayItems(service.getCurrentGeneration()));
     }
 
+    private void displaySurvivorLocation() {
+        IGeoPoint survivorGeoPoint = addMyNewLocationMarker();
+        mapController.setCenter(survivorGeoPoint);
+    }
 
     public void requestLocationServicesEnabling() {
         if (!isLocationServicesEnabled()) {
@@ -304,7 +269,7 @@ public class ZombieMapFragment extends Fragment {
         mapView.setBuiltInZoomControls(true);
         mapView.setMultiTouchControls(true);
         mapController = (MapController) this.mapView.getController();
-        mapController.setZoom(18);
+        mapController.setZoom(17);
     }
 
     public synchronized boolean isLBSrequested() {
