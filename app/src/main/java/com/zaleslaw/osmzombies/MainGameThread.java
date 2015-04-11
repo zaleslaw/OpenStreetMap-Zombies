@@ -10,7 +10,7 @@ public class MainGameThread extends Thread {
 
 
     private int record = 0;
-    static final long FPS = 1;
+    static final long FPS = 10;
     private ZombieMapFragment gameView;
     // flag to hold game state
     private boolean running;

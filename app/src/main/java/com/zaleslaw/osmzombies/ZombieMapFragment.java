@@ -132,6 +132,7 @@ public class ZombieMapFragment extends Fragment {
                         public boolean onItemSingleTapUp(final int index,
                                                          final OverlayItem item) {
                             service.kickZombie(item.getUid());
+                            Log.d("ZM", "Kick zombie " + item.getUid());
                             return true;
                         }
 
@@ -139,6 +140,7 @@ public class ZombieMapFragment extends Fragment {
                         public boolean onItemLongPress(final int index,
                                                        final OverlayItem item) {
                             service.killZombie(item.getUid());
+                            Log.d("ZM", "Kill zombie " + item.getUid());
                             return true;
                         }
                     }, mResourceProxy);
@@ -165,7 +167,7 @@ public class ZombieMapFragment extends Fragment {
         Drawable zombiePic = getResources().getDrawable(zombie);
         ArrayList<OverlayItem> items = new ArrayList<>();
         for (Zombie z : zombies) {
-            OverlayItem item = new OverlayItem(z.getId(), z.getName(), new GeoPoint(z.getLat(), z.getLon()));
+            OverlayItem item = new OverlayItem(z.getId(), z.getName(), z.getDescription(), new GeoPoint(z.getLat(), z.getLon()));
             item.setMarker(zombiePic);
             items.add(item);
         }
@@ -241,19 +243,20 @@ public class ZombieMapFragment extends Fragment {
 
     public void displayGameState() {
         if (gamerLocation != null) {
+            mMyLocationOverlay.removeAllItems();
             displaySurvivorLocation();
             displayZombieLocations();
+            mapView.invalidate();
         }
     }
 
     private void displayZombieLocations() {
-        mMyLocationOverlay.removeAllItems();
         mMyLocationOverlay.addItems(getZombieOverlayItems(service.getCurrentGeneration()));
     }
 
     private void displaySurvivorLocation() {
         IGeoPoint survivorGeoPoint = addMyNewLocationMarker();
-        mapController.setCenter(survivorGeoPoint);
+        //mapController.setCenter(survivorGeoPoint);
     }
 
     public void requestLocationServicesEnabling() {
@@ -269,7 +272,7 @@ public class ZombieMapFragment extends Fragment {
         mapView.setBuiltInZoomControls(true);
         mapView.setMultiTouchControls(true);
         mapController = (MapController) this.mapView.getController();
-        mapController.setZoom(17);
+        mapController.setZoom(16);
     }
 
     public synchronized boolean isLBSrequested() {

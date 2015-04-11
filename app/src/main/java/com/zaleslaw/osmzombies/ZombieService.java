@@ -2,6 +2,7 @@ package com.zaleslaw.osmzombies;
 
 
 import android.location.Location;
+import android.util.Log;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -25,7 +26,13 @@ public class ZombieService {
     }
 
     public List<Zombie> getFirstGeneration(Location gamerLocation) {
-        return dao.getZombies(gamerLocation);
+        final List<Zombie> zombies = dao.getZombies(gamerLocation);
+
+        for (Zombie z : zombies) {
+            currentGeneration.add(z);
+        }
+
+        return zombies;
     }
 
     public void kickZombie(String uid) {
@@ -76,26 +83,32 @@ public class ZombieService {
         double sLon = survivor.getLon();
 
         for (Zombie z : currentGeneration) {
-            double zombieLat = z.getLat() + z.getSpeed() * (sLat - z.getLat()) / 10000;
-            double zombieLon = z.getLon() + z.getSpeed() * (sLon - z.getLon()) / 10000;
+            double zombieLat = z.getLat() + z.getSpeed() * (sLat - z.getLat()) / 100000 + (0.5 - new Random().nextDouble()) / 50000;
+            double zombieLon = z.getLon() + z.getSpeed() * (sLon - z.getLon()) / 100000 + (0.5 - new Random().nextDouble()) / 50000;
             z.setLat(zombieLat);
             z.setLon(zombieLon);
         }
     }
 
     public void generateNewZombies() {
+
+        List<Zombie> newGeneration = new ArrayList<Zombie>();
+
+
         for (Zombie z : currentGeneration) {
-            if (new Random().nextDouble() * z.getHealth() > 2.5) {
+            if (new Random().nextDouble() * z.getHealth() > 2.9 && currentGeneration.size() < 30) {
                 zombieCounter++;
                 String newbyId = "Z" + zombieCounter;
 
-                double zombieLat = z.getLat() * (1 - new Random().nextDouble() / 10000);
-                double zombieLon = z.getLon() * (1 - new Random().nextDouble() / 10000);
+                double zombieLat = z.getLat() * (1 + (0.5 - new Random().nextDouble()) / 1000);
+                double zombieLon = z.getLon() * (1 + (0.5 - new Random().nextDouble()) / 1000);
 
                 // New zombies are more healthy and quickly than their parents
-                Zombie newby = new Zombie(newbyId, newbyId, newbyId, z.getHealth() + 1, z.getSpeed() + 1, zombieLat, zombieLon);
-                currentGeneration.add(newby);
+                Zombie newby = new Zombie(newbyId, newbyId, newbyId, z.getHealth() + 1, z.getSpeed() + 5, zombieLat, zombieLon);
+                newGeneration.add(newby);
+                Log.d("ZM", "Zombie # " + zombieCounter + " was born!");
             }
         }
+        currentGeneration.addAll(newGeneration);
     }
 }
