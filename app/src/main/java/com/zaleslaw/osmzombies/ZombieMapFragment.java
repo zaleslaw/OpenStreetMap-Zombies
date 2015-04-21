@@ -233,8 +233,7 @@ public class ZombieMapFragment extends Fragment {
         service.filterAliveZombies();
         service.updateZombieLocations();
         service.generateNewZombies();
-        boolean endGame = service.verifyEndGameCondition();
-        if (endGame) {
+        if (service.isGameOver()) {
             loopThread.setRunning(false);
             Toast.makeText(getActivity(), "You are death!", Toast.LENGTH_SHORT).show();
         }

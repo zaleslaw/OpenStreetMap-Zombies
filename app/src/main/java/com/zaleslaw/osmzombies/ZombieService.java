@@ -39,6 +39,7 @@ public class ZombieService {
         for (Zombie z : currentGeneration) {
             if (z.getId().equals(uid)) {
                 z.decreaseHealth(1);
+                survivor.incrementScores(2);
             }
         }
     }
@@ -47,6 +48,7 @@ public class ZombieService {
         for (Zombie z : currentGeneration) {
             if (z.getId().equals(uid)) {
                 z.kill();
+                survivor.incrementScores(1);
             }
         }
     }
@@ -65,7 +67,10 @@ public class ZombieService {
         survivor.setLon(gamerLocation.getLongitude());
     }
 
-    public boolean verifyEndGameCondition() {
+    public boolean isGameOver() {
+        if (survivor.getHealth() <= 0) {
+            return true;
+        }
         return false;
     }
 
